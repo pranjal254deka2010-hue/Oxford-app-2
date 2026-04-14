@@ -5,78 +5,138 @@ import pandas as pd
 import os
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="OPI Portal", layout="centered")
+st.set_page_config(page_title="OPI Management Portal", page_icon="🎓", layout="centered")
 
-# --- DATA STORAGE ---
-if not os.path.exists("payments.csv"):
-    pd.DataFrame(columns=["Date", "Name", "Purpose", "Amount"]).to_csv("payments.csv", index=False)
+# --- CUSTOM STYLING ---
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 5px;
+        height: 3em;
+        background-color: #002e63;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- HEADER ---
-st.markdown("<h1 style='text-align: center; color: #002e63;'>OXFORD PARAMEDICAL INSTITUTE</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-weight: bold;'>Dhupdhara, Goalpara, Assam | ESTD. 2009</p>", unsafe_allow_html=True)
+# --- HEADER SECTION ---
+col1, col2 = st.columns([1, 4])
+with col1:
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=100)
+with col2:
+    st.markdown("<h2 style='color: #002e63; margin-bottom: 0;'>OXFORD PARAMEDICAL INSTITUTE</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='margin-top: 0;'>ESTD. 2009 | Excellence in Healthcare Education</p>", unsafe_allow_html=True)
 
 st.divider()
 
-menu = st.sidebar.selectbox("Menu", ["Create Receipt", "Payment History"])
+# --- APP NAVIGATION ---
+menu = st.sidebar.selectbox("MENU", ["Generate Receipt", "Mark Attendance", "Student Records"])
 
-if menu == "Create Receipt":
-    st.subheader("📝 New Fees Receipt")
-    with st.form("f1"):
-        name = st.text_input("Student Name")
-        course = st.selectbox("Course", ["DMLT", "ICU Technology", "ECG Tech", "First Aid"])
-        purpose = st.selectbox("Purpose", ["Monthly Fee", "Admission Fee", "Registration Fee", "Other"])
-        months = st.text_input("For Months (e.g. April to June)", "N/A")
-        amt = st.number_input("Total Amount Paid (₹)", min_value=0.0)
-        mode = st.selectbox("Mode", ["Cash", "Online", "UPI", "Cheque"])
-        submit = st.form_submit_button("Generate Official PDF")
+# --- DATABASE SETUP (CSV) ---
+if not os.path.exists("students.csv"):
+    pd.DataFrame(columns=["Name", "Course", "Phone"]).to_csv("students.csv", index=False)
 
-    if submit and name:
-        today = datetime.now().strftime("%d-%m-%Y")
-        # Save Record
-        pd.DataFrame([[today, name, purpose, amt]], columns=["Date", "Name", "Purpose", "Amount"]).to_csv("payments.csv", mode='a', header=False, index=False)
+# --- 1. GENERATE RECEIPT ---
+if menu == "Generate Receipt":
+    st.subheader("📝 Fee Receipt Generator")
+    
+    with st.form("receipt_form"):
+        receipt_no = f"OPI-{datetime.now().strftime('%y%m%s')[:6]}"
+        date_str = datetime.now().strftime("%d %b, %Y")
+        
+        student_name = st.text_input("STUDENT NAME")
+        course = st.selectbox("COURSE ENROLLED", ["DMLT", "ICU Technology", "ECG Technician", "First Aid"])
+        pay_mode = st.radio("PAYMENT MODE", ["Online", "Cash", "Cheque"], horizontal=True)
+        amount = st.number_input("AMOUNT RECEIVED (₹)", min_value=0.0, step=500.0)
+        
+        generate = st.form_submit_button("Generate Professional PDF")
 
-        # Build PDF
+    if generate and student_name:
+        # Create PDF
         pdf = FPDF()
         pdf.add_page()
-        pdf.rect(5, 5, 200, 287) # Border
         
+        # Add Border
+        pdf.rect(5, 5, 200, 287)
+        
+        # Header in PDF
         if os.path.exists("logo.png"):
-            pdf.image("logo.png", 10, 10, 30)
-            
+            pdf.image("logo.png", 10, 10, 25)
+        
         pdf.set_font("Arial", 'B', 16)
+        pdf.set_text_color(0, 46, 99)
         pdf.cell(0, 10, "OXFORD PARAMEDICAL INSTITUTE", ln=True, align='C')
-        pdf.set_font("Arial", 'B', 10)
-        pdf.cell(0, 5, "Dhupdhara, Goalpara, Assam", ln=True, align='C')
+        pdf.set_font("Arial", '', 10)
+        pdf.cell(0, 5, "ESTD. 2009", ln=True, align='C')
+        pdf.cell(0, 5, "Excellence in Healthcare Education", ln=True, align='C')
+        pdf.ln(15)
+        
+        # Receipt Details
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, "FEES RECEIPT", ln=True, align='C')
+        pdf.ln(5)
+        
+        pdf.set_font("Arial", '', 11)
+        pdf.cell(100, 10, f"Receipt No: {receipt_no}")
+        pdf.cell(0, 10, f"Date: {date_str}", ln=True, align='R')
+        pdf.line(10, 65, 200, 65)
+        pdf.ln(10)
+        
+        pdf.cell(0, 10, f"STUDENT NAME: {student_name.upper()}", ln=True)
+        pdf.cell(0, 10, f"COURSE ENROLLED: {course}", ln=True)
+        pdf.cell(0, 10, f"PAYMENT MODE: {pay_mode}", ln=True)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 15, f"AMOUNT RECEIVED: Rs. {amount:,.2f}", ln=True)
+        
         pdf.ln(20)
-        
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 10, "OFFICIAL FEES RECEIPT", ln=True, align='C')
-        pdf.ln(10)
-        
-        pdf.set_font("Arial", '', 12)
-        pdf.cell(0, 10, f"Date: {today}", ln=True, align='R')
-        pdf.cell(0, 12, f"Student: {name.upper()}", border='B', ln=True)
-        pdf.cell(0, 12, f"Course: {course}", border='B', ln=True)
-        pdf.cell(0, 12, f"Purpose: {purpose} ({months})", border='B', ln=True)
-        pdf.cell(0, 12, f"Mode: {mode}", border='B', ln=True)
-        
-        pdf.ln(10)
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 15, f"TOTAL PAID: Rs. {amt}", border=1, ln=True, align='C')
-        
-        if os.path.exists("signature.png"):
-            pdf.image("signature.png", 150, 160, 40)
-            
-        pdf.ln(40)
-        pdf.set_font("Arial", 'B', 10)
-        pdf.cell(0, 10, "__________________________", ln=True, align='R')
-        pdf.cell(0, 5, "Authorized Signatory      ", ln=True, align='R')
+        pdf.set_font("Arial", 'I', 10)
+        pdf.cell(0, 10, "This is a computer generated receipt.", align='C')
 
-        pdf_bytes = pdf.output(dest='S').encode('latin-1')
-        st.success("✅ Success! Your receipt is ready.")
-        st.download_button("Download PDF", pdf_bytes, f"OPI_Receipt_{name}.pdf")
+        # Download Button
+        pdf_output = pdf.output(dest='S').encode('latin-1')
+        st.success(f"Receipt for {student_name} generated!")
+        st.download_button(label="⬇️ Download PDF Receipt", data=pdf_output, file_name=f"OPI_Receipt_{student_name}.pdf", mime="application/pdf")
 
-elif menu == "Payment History":
-    st.subheader("💰 Collection Records")
-    if os.path.exists("payments.csv"):
-        st.dataframe(pd.read_csv("payments.csv"), use_container_width=True)
+# --- 2. ATTENDANCE ---
+elif menu == "Mark Attendance":
+    st.subheader(f"📅 Attendance: {datetime.now().strftime('%d-%m-%Y')}")
+    df = pd.read_csv("students.csv")
+    
+    if df.empty:
+        st.info("Please add students in 'Student Records' first.")
+    else:
+        attendance_data = []
+        for index, row in df.iterrows():
+            status = st.checkbox(f"{row['Name']} ({row['Course']})", key=row['Name'])
+            attendance_data.append({"Name": row['Name'], "Status": "Present" if status else "Absent"})
+        
+        if st.button("Save Today's Attendance"):
+            att_df = pd.DataFrame(attendance_data)
+            att_df['Date'] = datetime.now().strftime('%Y-%m-%d')
+            att_df.to_csv("attendance.csv", mode='a', index=False, header=not os.path.exists("attendance.csv"))
+            st.success("Attendance Recorded!")
+
+# --- 3. STUDENT RECORDS ---
+elif menu == "Student Records":
+    st.subheader("👥 Student Management")
+    
+    # Add Student
+    with st.expander("Add New Student"):
+        new_name = st.text_input("Name")
+        new_course = st.selectbox("Course", ["DMLT", "ICU Tech", "First Aid"], key="new_course")
+        new_phone = st.text_input("Phone Number")
+        if st.button("Save Student"):
+            new_row = pd.DataFrame([[new_name, new_course, new_phone]], columns=["Name", "Course", "Phone"])
+            new_row.to_csv("students.csv", mode='a', header=False, index=False)
+            st.success("Student Added!")
+            st.rerun()
+
+    # View Data
+    df = pd.read_csv("students.csv")
+    st.dataframe(df, use_container_width=True)
